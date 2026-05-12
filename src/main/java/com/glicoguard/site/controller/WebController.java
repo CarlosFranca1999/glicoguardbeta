@@ -1,9 +1,13 @@
-package com.glicoguard.site;
+package com.glicoguard.site.controller;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Optional;
 
+import com.glicoguard.site.model.AccessLevel;
+import com.glicoguard.site.model.UserAccount;
+import com.glicoguard.site.model.UserRole;
+import com.glicoguard.site.service.AuthService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.http.ResponseEntity;
@@ -192,27 +196,32 @@ public class WebController {
             return "redirect:/cadastro";
         }
 
-        AuthService.RegistrationResult result = authService.register(
-                name,
-                email,
-                cpf,
-                parsedBirthDate,
-                password,
-                role,
-                accessLevel,
-                caregiverInviteToken
-        );
-        if (result.hasError()) {
-            redirectAttributes.addFlashAttribute("error", result.errorMessage());
+        try {
+            AuthService.RegistrationResult result = authService.register(
+                    name,
+                    email,
+                    cpf,
+                    parsedBirthDate,
+                    password,
+                    role,
+                    accessLevel,
+                    caregiverInviteToken
+            );
+            if (result.hasError()) {
+                redirectAttributes.addFlashAttribute("error", result.errorMessage());
+                return "redirect:/cadastro";
+            }
+
+            if (role == UserRole.PACIENTE) {
+                redirectAttributes.addFlashAttribute("success", "Cadastro realizado com sucesso. O codigo para vincular cuidador foi enviado para o e-mail cadastrado.");
+            } else {
+                redirectAttributes.addFlashAttribute("success", "Cadastro realizado com sucesso. Agora faca login.");
+            }
+            return "redirect:/";
+        } catch (IllegalStateException exception) {
+            redirectAttributes.addFlashAttribute("error", exception.getMessage());
             return "redirect:/cadastro";
         }
-
-        if (role == UserRole.PACIENTE) {
-            redirectAttributes.addFlashAttribute("success", "Cadastro realizado com sucesso. O codigo para vincular cuidador foi enviado para o e-mail simulado na pasta sent-emails.");
-        } else {
-            redirectAttributes.addFlashAttribute("success", "Cadastro realizado com sucesso. Agora faca login.");
-        }
-        return "redirect:/";
     }
 
     @PostMapping("/admin/cadastro")
@@ -248,18 +257,23 @@ public class WebController {
             return "redirect:/admin/cadastro";
         }
 
-        AuthService.RegistrationResult result = authService.register(
-                name,
-                email,
-                cpf,
-                parsedBirthDate,
-                password,
-                UserRole.ADMINISTRADOR,
-                accessLevel,
-                null
-        );
-        if (result.hasError()) {
-            redirectAttributes.addFlashAttribute("error", result.errorMessage());
+        try {
+            AuthService.RegistrationResult result = authService.register(
+                    name,
+                    email,
+                    cpf,
+                    parsedBirthDate,
+                    password,
+                    UserRole.ADMINISTRADOR,
+                    accessLevel,
+                    null
+            );
+            if (result.hasError()) {
+                redirectAttributes.addFlashAttribute("error", result.errorMessage());
+                return "redirect:/admin/cadastro";
+            }
+        } catch (IllegalStateException exception) {
+            redirectAttributes.addFlashAttribute("error", exception.getMessage());
             return "redirect:/admin/cadastro";
         }
 
@@ -281,9 +295,12 @@ public class WebController {
                     getSourceIp(request)
             );
             session.setAttribute(PENDING_2FA_EMAIL, email.trim().toLowerCase());
-            redirectAttributes.addFlashAttribute("success", "Senha validada. O codigo 2FA foi enviado para o e-mail simulado na pasta sent-emails e expira em " + challenge.expiresAt() + ".");
+            redirectAttributes.addFlashAttribute("success", "Senha validada. O codigo de verificacao foi enviado para o e-mail cadastrado e expira em " + challenge.expiresAt() + ".");
             return "redirect:/2fa";
         } catch (IllegalArgumentException exception) {
+            redirectAttributes.addFlashAttribute("error", exception.getMessage());
+            return "redirect:/";
+        } catch (IllegalStateException exception) {
             redirectAttributes.addFlashAttribute("error", exception.getMessage());
             return "redirect:/";
         }
@@ -327,10 +344,10 @@ public class WebController {
 
         try {
             AuthService.PasswordResetView resetView = authService.createPasswordReset(email);
-            redirectAttributes.addFlashAttribute("success", "Token de recuperacao gerado com sucesso.");
-            redirectAttributes.addFlashAttribute("resetCodePreview",
-                    "Token temporario de demonstracao: " + resetView.token() + " (valido ate " + resetView.expiresAt() + ")");
+            redirectAttributes.addFlashAttribute("success", "Token de recuperacao enviado para o e-mail cadastrado. Valido ate " + resetView.expiresAt() + ".");
         } catch (IllegalArgumentException exception) {
+            redirectAttributes.addFlashAttribute("error", exception.getMessage());
+        } catch (IllegalStateException exception) {
             redirectAttributes.addFlashAttribute("error", exception.getMessage());
         }
 
@@ -556,7 +573,7 @@ public class WebController {
         model.addAttribute("pageEyebrow", "Cadastro de usuarios");
         model.addAttribute("pageTitle", "Criacao de conta");
         model.addAttribute("leadText", "Preencha os dados abaixo para criar uma conta de paciente ou cuidador na plataforma.");
-        model.addAttribute("infoText", "Quando o perfil de paciente for criado, o codigo de vinculacao do cuidador sera disponibilizado no e-mail simulado armazenado na pasta sent-emails.");
+        model.addAttribute("infoText", "Quando o perfil de paciente for criado, o codigo de vinculacao do cuidador sera enviado para o e-mail informado no cadastro.");
         model.addAttribute("showCaregiverToken", true);
         model.addAttribute("backHref", "/");
         model.addAttribute("backLabel", "Voltar ao login");

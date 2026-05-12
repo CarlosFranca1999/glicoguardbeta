@@ -11,6 +11,13 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
+import com.glicoguard.site.model.AccessLevel;
+import com.glicoguard.site.model.UserAccount;
+import com.glicoguard.site.model.UserRole;
+import com.glicoguard.site.service.AuthService;
+import com.glicoguard.site.service.CryptoService;
+import com.glicoguard.site.service.EmailService;
+import com.glicoguard.site.service.ProtectedStorageService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -62,7 +69,7 @@ class AuthServiceSecurityTest {
                 "127.0.0.1"
         );
 
-        String code = extractLatestCodeFromEmail("carla@glicoguard.com");
+        String code = extractLatestCodeFromEmail("carla@glicoguard.com", "Codigo de verificacao");
 
         Optional<UserAccount> wrongCode = authService.completeTwoFactorAuthentication(
                 "carla@glicoguard.com",
@@ -102,6 +109,8 @@ class AuthServiceSecurityTest {
         authService.register("Eva", "eva@glicoguard.com", "12345678905", LocalDate.of(2000, 2, 20), "SenhaSegura123", UserRole.PACIENTE, AccessLevel.EDICAO, null);
 
         AuthService.PasswordResetView resetView = authService.createPasswordReset("eva@glicoguard.com");
+        String emailedToken = extractLatestCodeFromEmail("eva@glicoguard.com", "Token de recuperacao");
+        assertEquals(resetView.token(), emailedToken);
         authService.resetPassword("eva@glicoguard.com", resetView.token(), "NovaSenha123");
 
         IllegalArgumentException reuseError = assertThrows(IllegalArgumentException.class, () ->
@@ -115,7 +124,7 @@ class AuthServiceSecurityTest {
                 "browser-c",
                 "127.0.0.1"
         );
-        String code = extractLatestCodeFromEmail("eva@glicoguard.com");
+        String code = extractLatestCodeFromEmail("eva@glicoguard.com", "Codigo de verificacao");
         Optional<UserAccount> authenticated = authService.completeTwoFactorAuthentication(
                 "eva@glicoguard.com",
                 code,
@@ -149,7 +158,7 @@ class AuthServiceSecurityTest {
                 null
         );
 
-        String inviteCode = extractLatestCodeFromEmail("paciente@glicoguard.com");
+        String inviteCode = extractLatestCodeFromEmail("paciente@glicoguard.com", "Codigo para vincular cuidador");
 
         AuthService.RegistrationResult caregiverRegistration = authService.register(
                 "Cuidadora",
@@ -184,7 +193,7 @@ class AuthServiceSecurityTest {
                 null
         );
 
-        String inviteCode = extractLatestCodeFromEmail("paciente.reuso@glicoguard.com");
+        String inviteCode = extractLatestCodeFromEmail("paciente.reuso@glicoguard.com", "Codigo para vincular cuidador");
 
         authService.register(
                 "Cuidador 1",
@@ -241,7 +250,7 @@ class AuthServiceSecurityTest {
                 AccessLevel.EDICAO,
                 null
         );
-        String inviteCode = extractLatestCodeFromEmail("paciente.medicacao@glicoguard.com");
+        String inviteCode = extractLatestCodeFromEmail("paciente.medicacao@glicoguard.com", "Codigo para vincular cuidador");
         authService.register(
                 "Cuidadora Medicacao",
                 "cuidadora.medicacao@glicoguard.com",
@@ -313,9 +322,10 @@ class AuthServiceSecurityTest {
         authService.startPrimaryAuthentication("joao@glicoguard.com", "SenhaSegura123", "browser-z", "127.0.0.1");
     }
 
-    private String extractLatestCodeFromEmail(String email) {
+    private String extractLatestCodeFromEmail(String email, String subjectFragment) {
         return emailService.buildEmailView().stream()
                 .filter(view -> view.to().equalsIgnoreCase(email))
+                .filter(view -> view.subject().contains(subjectFragment))
                 .findFirst()
                 .map(view -> view.body().lines().findFirst().orElseThrow())
                 .map(line -> line.substring(line.lastIndexOf(' ') + 1))

@@ -24,7 +24,7 @@
         </div>
 
         <div class="info-box">
-            O token de recuperacao permanece disponivel no e-mail simulado armazenado na pasta <code>sent-emails</code>.
+            O token de recuperacao sera encaminhado para o e-mail cadastrado pelo usuario.
         </div>
 
         <a class="text-link" th:href="@{/}">Voltar para o login</a>
@@ -33,8 +33,6 @@
     <section class="forms-card">
         <div th:if="${success}" class="alert success" th:text="${success}"></div>
         <div th:if="${error}" class="alert error" th:text="${error}"></div>
-        <div th:if="${resetCodePreview}" class="alert success" th:text="${resetCodePreview}"></div>
-
         <div class="form-block">
             <h2>Solicitar token</h2>
             <form method="post" th:action="@{/recuperar-senha}">

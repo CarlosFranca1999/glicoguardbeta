@@ -1,4 +1,4 @@
-package com.glicoguard.site;
+package com.glicoguard.site.config;
 
 import java.io.IOException;
 

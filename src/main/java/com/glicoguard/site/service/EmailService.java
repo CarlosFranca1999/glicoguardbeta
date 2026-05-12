@@ -1,4 +1,4 @@
-package com.glicoguard.site;
+package com.glicoguard.site.service;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -10,8 +10,10 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
+import com.glicoguard.site.model.EmailNotification;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.mail.MailException;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -28,21 +30,25 @@ public class EmailService {
     private final JavaMailSender mailSender;
     private final boolean mailEnabled;
     private final String fromAddress;
+    private final boolean requireRealDelivery;
 
+    @Autowired
     public EmailService(ObjectProvider<JavaMailSender> mailSenderProvider,
                         @Value("${glicoguard.mail.enabled:false}") boolean mailEnabled,
-                        @Value("${glicoguard.mail.from:no-reply@glicoguard.local}") String fromAddress) {
-        this(mailSenderProvider.getIfAvailable(), mailEnabled, fromAddress);
+                        @Value("${glicoguard.mail.from:no-reply@glicoguard.local}") String fromAddress,
+                        @Value("${glicoguard.mail.require-real-delivery:true}") boolean requireRealDelivery) {
+        this(mailSenderProvider.getIfAvailable(), mailEnabled, fromAddress, requireRealDelivery);
     }
 
-    EmailService() {
-        this((JavaMailSender) null, false, "no-reply@glicoguard.local");
+    public EmailService() {
+        this((JavaMailSender) null, false, "no-reply@glicoguard.local", false);
     }
 
-    EmailService(JavaMailSender mailSender, boolean mailEnabled, String fromAddress) {
+    EmailService(JavaMailSender mailSender, boolean mailEnabled, String fromAddress, boolean requireRealDelivery) {
         this.mailSender = mailSender;
         this.mailEnabled = mailEnabled;
         this.fromAddress = fromAddress;
+        this.requireRealDelivery = requireRealDelivery;
     }
 
     public synchronized void sendEmail(String to, String subject, String body) {
@@ -60,9 +66,14 @@ public class EmailService {
                 persistEmail(notification, "ENVIADO_POR_SMTP");
                 return;
             } catch (MailException exception) {
-                persistEmail(notification, "FALHA_SMTP_USANDO_CAIXA_LOCAL");
+                persistEmail(notification, "FALHA_SMTP");
                 throw new IllegalStateException("Falha ao enviar e-mail por SMTP. Verifique usuario, senha de app e configuracao do Gmail.", exception);
             }
+        }
+
+        if (requireRealDelivery) {
+            persistEmail(notification, "FALHA_CONFIGURACAO_SMTP");
+            throw new IllegalStateException("O envio real de e-mail esta obrigatório, mas o SMTP nao foi inicializado corretamente.");
         }
 
         persistEmail(notification, "SIMULADO_CAIXA_LOCAL");
@@ -94,6 +105,7 @@ public class EmailService {
             String filename = FILE_STAMP.format(notification.getSentAt())
                     + "-" + sanitizeFilePart(notification.getTo()) + ".txt";
             String content = "Modo: " + deliveryMode + System.lineSeparator()
+                    + "Remetente: " + fromAddress + System.lineSeparator()
                     + "Para: " + notification.getTo() + System.lineSeparator()
                     + "Assunto: " + notification.getSubject() + System.lineSeparator()
                     + "Enviado em: " + VIEW_STAMP.format(notification.getSentAt()) + System.lineSeparator()

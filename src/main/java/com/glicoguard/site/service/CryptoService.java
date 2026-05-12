@@ -1,4 +1,4 @@
-package com.glicoguard.site;
+package com.glicoguard.site.service;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
